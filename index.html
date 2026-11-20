@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080d1c">
+<meta name="description" content="سامانه ریاضی مدرسه امام رضا واحد ۳؛ مدیریت کلاس‌ها، تکالیف، گزارش کار و پیام‌ها">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>سامانه ریاضی مدرسه امام رضا واحد ۳</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root{
+--bg:#080d1c;--panel:#111a30;--panel2:#172440;
+--line:#283958;--txt:#edf4ff;--muted:#9fb0ce;
+--cyan:#43d9ee;--violet:#9b83ff;--green:#4cdb9b;--red:#ff7188
+}
+*{box-sizing:border-box}
+body{
+margin:0;background:var(--bg);color:var(--txt);
+font-family:Tahoma,Arial,sans-serif;min-height:100vh;overflow-x:hidden
+}
+body:before{
+content:"∑   π   √   x²   ÷   ∞   +   −";
+position:fixed;inset:0;pointer-events:none;
+color:#6be6ff0c;font-size:clamp(28px,5vw,64px);
+letter-spacing:30px;line-height:2.3;word-spacing:22px;
+transform:rotate(-13deg);z-index:0
+}
+#particles{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.particle{
+position:absolute;width:4px;height:4px;border-radius:50%;
+background:var(--cyan);opacity:.4;
+box-shadow:0 0 12px var(--cyan);
+animation:floatParticle linear infinite
+}
+@keyframes floatParticle{
+0%{transform:translateY(110vh) translateX(0);opacity:0}
+10%{opacity:.5}
+90%{opacity:.4}
+100%{transform:translateY(-10vh) translateX(70px);opacity:0}
+}
+button,input,select,textarea{font:inherit}
+button{
+cursor:pointer;border:0;border-radius:12px;padding:11px 16px;
+color:#06101d;background:linear-gradient(110deg,var(--cyan),#8b9dff);
+font-weight:bold
+}
+button.secondary{background:#263858;color:var(--txt);border:1px solid var(--line)}
+button.danger{background:#55283a;color:#ffdce4}
+button:disabled{opacity:.5;cursor:not-allowed}
+input,select,textarea{
+width:100%;padding:12px;border-radius:11px;border:1px solid var(--line);
+background:#0b1428;color:var(--txt);outline:none
+}
+textarea{min-height:95px;resize:vertical}
+label{display:block;color:var(--muted);font-size:13px;margin:12px 0 6px}
+.wrap{position:relative;z-index:1;max-width:1180px;margin:auto;padding:22px}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.logo{
+width:45px;height:45px;border-radius:14px;display:grid;place-items:center;
+background:linear-gradient(135deg,var(--cyan),var(--violet));
+color:#07101d;font-size:24px;font-weight:bold
+}
+.brand h1{font-size:20px;margin:0}
+.brand small{color:var(--muted)}
+.card{
+background:linear-gradient(145deg,#121e36ed,#0e172bed);
+border:1px solid var(--line);border-radius:19px;padding:20px;
+box-shadow:0 18px 50px #0005;backdrop-filter:blur(8px)
+}
+.login{max-width:510px;margin:6vh auto}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.full{grid-column:1/-1}
+.hint{font-size:12px;color:var(--muted);line-height:1.8}
+.error{color:#ff9bad;margin-top:10px}
+.success{color:#75e9b4;margin-top:10px}
+header.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.top-actions{display:flex;gap:8px;flex-wrap:wrap}
+.tabs{display:flex;gap:8px;overflow-x:auto;flex-wrap:nowrap;margin:15px 0;padding-bottom:5px}
+.tabs button{white-space:nowrap;flex:0 0 auto;background:#172541;color:var(--muted);border:1px solid var(--line)}
+.tabs button.active{background:linear-gradient(110deg,var(--cyan),#9b8cff);color:#06101d}
+.statgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+.stat{background:#121f39;border:1px solid var(--line);border-radius:15px;padding:15px}
+.stat b{font-size:24px;display:block;color:var(--cyan);margin-top:6px}
+.section{display:none}
+.section.active{display:block}
+.classcards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.classcard{padding:15px;border-radius:14px;border:1px solid var(--line);background:#101c34;text-align:center}
+.classcard b{font-size:20px;color:var(--cyan)}
+.list{display:grid;gap:10px;margin-top:14px}
+.item{overflow-wrap:anywhere;background:#0c162a;border:1px solid var(--line);border-radius:13px;padding:14px}
+.item h3{font-size:15px;margin:0 0 7px}
+.meta{font-size:12px;color:var(--muted);line-height:1.8}
+.empty{color:var(--muted);padding:22px;text-align:center;border:1px dashed var(--line);border-radius:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1}
+.row button{flex:0 0 auto}
+.hidden{display:none!important}
+.report-tabs{display:flex;gap:8px;margin:12px 0}
+.report-tabs button{flex:1}
+@media(max-width:700px){
+.wrap{padding:13px}.grid{grid-template-columns:1fr}
+.statgrid{grid-template-columns:repeat(2,1fr)}
+.card{padding:15px}
+}
+</style>
+</head>
+
+<body>
+<div id="particles"></div>
+<main class="wrap">
+
+<div class="brand">
+<div class="logo">∑</div>
+<div>
+<h1>Math Class Pro <span style="color:var(--cyan)">ULTRA</span></h1>
+<small>سامانه ریاضی مدرسه امام رضا واحد ۳</small>
+</div>
+</div>
+
+<section id="loginView" class="card login">
+<h2 style="margin-top:0">ورود به سامانه</h2>
+<p class="hint">ابتدا اطلاعات حساب خود را وارد کنید. ورود فقط با رمز صحیح حساب انجام می‌شود.</p>
+
+<div class="grid">
+<div>
+<label>نوع حساب</label>
+<select id="rolePick">
+<option value="leader">سرگروه</option>
+<option value="chief">سرگروه کل</option>
+<option value="teacher">معلم</option>
+<option value="support-rahmati">پشتیبان رحمتی</option>
+<option value="support-hajibadi">پشتیبان حاجی‌آبادی</option>
+</select>
+</div>
+
+<div id="classWrap">
+<label>کلاس</label>
+<select id="classPick">
+<option value="">انتخاب کلاس</option>
+<option>۷۰۳</option>
+<option>۷۰۴</option>
+</select>
+</div>
+
+<div id="nameWrap" class="full">
+<label>نام و گروه</label>
+<select id="namePick"><option value="">ابتدا کلاس را انتخاب کنید</option></select>
+</div>
+
+<div id="emailWrap" class="full hidden">
+<label>ایمیل حساب</label>
+<input id="email" type="email" autocomplete="username" placeholder="ایمیل حساب">
+</div>
+
+<div class="full">
+<label>رمز عبور</label>
+<input id="password" type="password" autocomplete="current-password" placeholder="رمز عبور حساب">
+</div>
+
+<div class="full">
+<button id="loginBtn" style="width:100%">ورود امن</button>
+<div id="loginMsg" class="hint" aria-live="polite"></div>
+</div>
+</div>
+<p class="hint">اگر حساب یا رمز شما هنوز در سامانه ساخته نشده باشد، ورود انجام نمی‌شود.</p>
+</section>
+
+<section id="appView" class="hidden">
+
+<header class="top">
+<div>
+<h2 id="welcome" style="margin:0 0 5px">پنل کاربری</h2>
+<div class="hint" id="userMeta"></div>
+</div>
+<div class="top-actions">
+<button class="secondary hidden" id="installBtn">نصب اپلیکیشن</button>
+<button class="secondary" id="logoutBtn">خروج از حساب</button>
+</div>
+</header>
+
+<div class="statgrid">
+<div class="stat">کلاس‌های سامانه<b>۲</b></div>
+<div class="stat">سرگروه‌ها<b>۱۴</b></div>
+<div class="stat">گزارش‌های من<b id="myReports">۰</b></div>
+<div class="stat">امتیازهای ثبت‌شده<b id="scoresCount">۰</b></div>
+</div>
+
+<nav class="tabs" id="tabs">
+<button class="active" data-tab="reports">گزارش کار</button>
+<button data-tab="classes">کلاس‌ها</button>
+<button data-tab="scores">امتیاز گروه‌ها</button>
+<button data-tab="homework">تکالیف</button>
+<button data-tab="assistant">هوش مصنوعی (به‌زودی)</button>
+<button data-tab="support">پشتیبانی</button>
+</nav>
+
+<!-- گزارش‌ها -->
+<section id="reports" class="section active">
+<div class="card">
+<h2>گزارش کار کلاس‌ها</h2>
+<p class="hint" id="reportDescription"></p>
+
+<div id="reportForm">
+<div class="grid">
+<div id="reportClassWrap">
+<label>کلاس گزارش</label>
+<select id="reportClass">
+<option value="۷۰۳">۷۰۳</option>
+<option value="۷۰۴">۷۰۴</option>
+</select>
+</div>
+
+<div>
+<label>گروه</label>
+<select id="reportGroup"></select>
+</div>
+
+<div class="full">
+<label>عنوان گزارش</label>
+<input id="reportTitle" placeholder="مثلاً فعالیت جلسه سوم">
+</div>
+
+<div class="full">
+<label>شرح گزارش</label>
+<textarea id="reportContent" placeholder="شرح فعالیت یا گزارش کار..."></textarea>
+</div>
+
+<div class="full">
+<button id="saveReport">ثبت گزارش</button>
+</div>
+</div>
+</div>
+
+<div id="teacherReports" class="hidden">
+<div class="report-tabs">
+<button id="show703" class="active">گزارش‌های ۷۰۳</button>
+<button id="show704" class="secondary">گزارش‌های ۷۰۴</button>
+</div>
+<div id="reportsList" class="list">
+<div class="empty">در حال دریافت گزارش‌ها...</div>
+</div>
+</div>
+
+<div id="reportUserMessage" class="hint hidden"></div>
+</div>
+</section>
+
+<!-- کلاس‌ها -->
+<section id="classes" class="section">
+<div class="card">
+<h2>مدیریت کلاس‌ها</h2>
+<p class="hint">اطلاعات سرگروه کل و سرگروه‌های هر کلاس در این قسمت نمایش داده می‌شود.</p>
+
+<label>انتخاب کلاس</label>
+<select id="leadershipClass">
+<option value="۷۰۳">کلاس ۷۰۳</option>
+<option value="۷۰۴">کلاس ۷۰۴</option>
+</select>
+
+<h3>سرگروه کل</h3>
+<div id="classChief" class="list"></div>
+
+<h3>سرگروه‌ها</h3>
+<div id="classLeaders" class="list"></div>
+
+<hr style="border:0;border-top:1px solid var(--line);margin:22px 0">
+<h3>اعضای گروه‌ها</h3>
+<p class="hint" id="groupMemberDescription">اعضای هر گروه در این قسمت نمایش داده می‌شوند.</p>
+<div id="groupMemberForm" class="hidden">
+ <div class="grid">
+  <div>
+   <label>گروه موردنظر</label>
+   <select id="memberGroup"></select>
+  </div>
+  <div>
+   <label>نام عضو جدید</label>
+   <input id="memberName" maxlength="80" placeholder="نام و نام خانوادگی دانش‌آموز">
+  </div>
+  <div class="full">
+   <button id="addGroupMember" type="button">افزودن عضو به گروه</button>
+   <div id="memberMsg" class="hint" aria-live="polite"></div>
+  </div>
+ </div>
+</div>
+<div id="groupMembersList" class="list"><div class="empty">در حال دریافت اعضای گروه‌ها...</div></div>
+</div>
+</section>
+
+<!-- امتیازها -->
+<section id="scores" class="section">
+<div class="card">
+<h2>امتیازدهی گروه‌ها</h2>
+<p class="hint">ثبت امتیاز فقط برای معلم فعال است. سایر کاربران فقط امکان مشاهده امتیازها را دارند.</p>
+
+<label>انتخاب کلاس</label>
+<select id="scoreClass">
+<option>۷۰۳</option>
+<option>۷۰۴</option>
+</select>
+
+<div id="scoreForm" class="hidden">
+<div class="grid">
+<div>
+<label>گروه</label>
+<select id="scoreGroup"></select>
+</div>
+<div>
+<label>امتیاز (مثبت یا منفی)</label>
+<input id="scorePoints" type="number" value="1">
+</div>
+<div class="full">
+<label>دلیل امتیاز</label>
+<textarea id="scoreReason" placeholder="دلیل ثبت امتیاز..."></textarea>
+</div>
+<div class="full">
+<button id="saveScore">ثبت امتیاز</button>
+</div>
+</div>
+</div>
+<div id="scoresList" class="list"></div>
+</div>
+</section>
+
+<!-- تکالیف -->
+<section id="homework" class="section">
+<div class="card">
+<h2>تکالیف</h2>
+<p class="hint">همه کاربران کلاس‌های ۷۰۳ و ۷۰۴ می‌توانند تکالیف را مشاهده کنند؛ فقط معلم امکان ثبت تکلیف دارد.</p>
+
+<div id="homeworkForm" class="hidden">
+<h3>ثبت تکلیف جدید</h3>
+<div class="grid">
+<div>
+<label>کلاس</label>
+<select id="homeworkClass">
+  <option value="۷۰۳">کلاس ۷۰۳</option>
+  <option value="۷۰۴">کلاس ۷۰۴</option>
+  <option value="both">هر دو کلاس (۷۰۳ و ۷۰۴)</option>
+</select>
+</div>
+<div>
+<label>گروه</label>
+<select id="homeworkGroup">
+<option value="">همه گروه‌های کلاس</option>
+</select>
+</div>
+<div class="full">
+<label>عنوان تکلیف</label>
+<input id="homeworkTitle" placeholder="عنوان تکلیف">
+</div>
+<div class="full">
+<label>توضیحات تکلیف</label>
+<textarea id="homeworkDescription"></textarea>
+</div>
+<div>
+<label>مهلت انجام</label>
+<div class="full">
+  <label>مهلت انجام تکلیف</label>
+
+  <div class="grid">
+    <select id="homeworkDueDay">
+      <option value="">روز</option>
+      <script>
+        for(let i=1;i<=31;i++){
+          document.write(`<option value="${i}">${i}</option>`);
+        }
+      </script>
+    </select>
+
+    <select id="homeworkDueMonth">
+      <option value="">ماه</option>
+      <option value="1">فروردین</option>
+      <option value="2">اردیبهشت</option>
+      <option value="3">خرداد</option>
+      <option value="4">تیر</option>
+      <option value="5">مرداد</option>
+      <option value="6">شهریور</option>
+      <option value="7">مهر</option>
+      <option value="8">آبان</option>
+      <option value="9">آذر</option>
+      <option value="10">دی</option>
+      <option value="11">بهمن</option>
+      <option value="12">اسفند</option>
+    </select>
+
+    <select id="homeworkDueYear">
+      <option value="1405">۱۴۰۵</option>
+      <option value="1406">۱۴۰۶</option>
+      <option value="1407">۱۴۰۷</option>
+    </select>
+  </div>
+</div>
+</div>
+<div class="full">
+<button id="saveHomework">ثبت تکلیف</button>
+</div>
+</div>
+</div>
+
+<div id="homeworkFilterWrap" class="hidden">
+<label>نمایش تکالیف کلاس</label>
+<select id="homeworkClassFilter">
+<option value="all">همه کلاس‌ها</option>
+<option value="703">کلاس ۷۰۳</option>
+<option value="704">کلاس ۷۰۴</option>
+</select>
+</div>
+<div id="homeworkList" class="list"></div>
+</div>
+</section>
+
+<!-- هوش مصنوعی -->
+<section id="assistant" class="section">
+<div class="card">
+<h2>دستیار هوش مصنوعی ریاضی</h2>
+<p class="hint">این بخش در حال توسعه است. به‌زودی یک دستیار هوشمند واقعی برای آموزش ریاضی در این قسمت فعال خواهد شد.</p>
+<div class="empty">🚀 به‌زودی فعال می‌شود</div>
+<textarea disabled placeholder="این امکان هنوز فعال نشده است."></textarea>
+<button disabled>ارسال سؤال</button>
+</div>
+</section>
+
+<!-- پشتیبانی -->
+<section id="support" class="section">
+<div class="card">
+<h2>بخش پشتیبانی و ارتباط با معلم</h2>
+<p class="hint">از این قسمت می‌توانید با معلم و پشتیبان‌های سامانه ارتباط برقرار کنید.</p>
+
+<div id="supportSend">
+<label>ارسال پیام به</label>
+<select id="supportRecipient">
+<option value="teacher">معلم</option>
+<option value="rahmati">رحمتی</option>
+<option value="hajibadi">حاجی‌آبادی</option>
+<option value="both">هر دو پشتیبان</option>
+</select>
+
+<label>متن پیام</label>
+<textarea id="supportContent" placeholder="پیام خود را بنویسید..."></textarea>
+<button id="sendSupport">ارسال پیام</button>
+</div>
+
+<div id="supportReplyBox" class="hidden">
+<div class="hint" id="replyInfo">پاسخ به پیام</div>
+<label>متن پاسخ</label>
+<textarea id="supportReplyText"></textarea>
+<button id="sendReply">ارسال پاسخ</button>
+<button class="secondary" id="cancelReply">لغو پاسخ</button>
+</div>
+
+<h3>پیام‌ها و گفتگوها</h3>
+<div id="supportMessages" class="list"></div>
+</div>
+</section>
+
+</section>
+</main>
+
+<script>
+/* تنظیمات اتصال */
+const SUPABASE_URL='https://dtqgjodpdioatzlnibmw.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_NelIowbkZsNDSOhY8a9q1A_s5-t78U-';
+
+if(!window.supabase?.createClient){
+ document.getElementById('loginMsg').textContent='کتابخانه اتصال بارگذاری نشد. اینترنت را بررسی کنید.';
+ throw new Error('Supabase JS library unavailable');
+}
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+/* اطلاعات کلاس‌ها */
+const roster={
+ '۷۰۳':['معنوی','ایادی','عقلایی','سلطان‌پور','انتخابی','حیدری','توسلی'],
+ '۷۰۴':['علیزاده','حلیمی','بهراد','امیردادی','ریاضی','اسحاقی','شاکر']
+};
+const chiefs={
+ '۷۰۳':'امیرحسین بهرامی',
+ '۷۰۴':'سالاری'
+};
+
+const toLatin=s=>({'۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'}[s]||s);
+const clsLatin=c=>[...String(c)].map(toLatin).join('');
+const $=id=>document.getElementById(id);
+
+let current=null,profile=null,replyTarget=null,replyThread=null,supportIdentity=null;
+let teacherReportClass='۷۰۳';
+
+function groupsFor(c){return Array.from({length:7},(_,i)=>i+1)}
+function fillGroups(el,c,includeAll=false){
+ const options=groupsFor(c).map(n=>`<option value="${n}">گروه ${n}</option>`).join('');
+ el.innerHTML=(includeAll?'<option value="">همه گروه‌های کلاس</option>':'')+options;
+}
+function profileClass(p){
+ return String(p?.class_id??p?.classId??'').replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+}
+function isTeacher(){return profile?.role==='teacher'}
+function isLeader(){return profile?.role==='leader'}
+function isSupport(){return profile?.role==='support'}
+function roleCanScore(){return isTeacher()}
+function classFor(c){return clsLatin(c)}
+function allowedClass(c){return isTeacher()||profileClass(profile)===classFor(c)}
+function canCreateReport(){return !!profile&&!isTeacher()&&!!profileClass(profile)}
+function esc(s){
+ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmt(d){
+ if(!d)return 'تاریخ نامشخص';
+ const x=new Date(d);
+ return isNaN(x)?esc(d):x.toLocaleString('fa-IR');
+}
+function setMsg(t,ok=false){
+ $('loginMsg').className=ok?'success':'error';
+ $('loginMsg').textContent=t;
+}
+
+/* تشخیص هویت پشتیبان */
+function inferSupportKey(p){
+ const key=String(p?.support_key||'').trim().toLowerCase();
+ if(key==='rahmati'||key==='hajibadi')return key;
+ const raw=[p?.full_name,p?.name,p?.email].filter(Boolean).join(' ').toLowerCase().replace(/[\s‌_-]/g,'');
+ if(raw.includes('رحمتی')||raw.includes('rahmati'))return 'rahmati';
+ if(raw.includes('حاجی')||raw.includes('آبادی')||raw.includes('hajabadi')||raw.includes('hajibadi'))return 'hajibadi';
+ return null;
+}
+function getRecipientKey(){return isTeacher()?'teacher':supportIdentity}
+
+/* انتخاب نوع حساب */
+$('rolePick').addEventListener('change',()=>{
+ const role=$('rolePick').value;
+ const special=role==='teacher'||role.startsWith('support-');
+ $('classWrap').classList.toggle('hidden',special);
+ $('nameWrap').classList.toggle('hidden',special);
+ $('emailWrap').classList.toggle('hidden',!special);
+ $('classPick').value='';
+ $('namePick').innerHTML='<option value="">ابتدا کلاس را انتخاب کنید</option>';
+ $('email').placeholder=role==='support-rahmati'?'ایمیل حساب پشتیبان رحمتی':
+ role==='support-hajibadi'?'ایمیل حساب پشتیبان حاجی‌آبادی':'ایمیل حساب معلم';
+});
+
+/* فهرست سرگروه‌ها هنگام ورود */
+$('classPick').addEventListener('change',()=>{
+ const c=$('classPick').value,role=$('rolePick').value;
+ if(!c)return;
+ const rows=role==='chief'
+ ?[{label:chiefs[c],value:`chief-${clsLatin(c)}`}]
+ :roster[c].map((n,i)=>({label:`${n} — گروه ${i+1}`,value:`leader-${clsLatin(c)}-g${String(i+1).padStart(2,'0')}`}));
+ $('namePick').innerHTML='<option value="">انتخاب نام</option>'+rows.map(x=>`<option value="${x.value}">${x.label}</option>`).join('');
+});
+
+/* ورود */
+$('loginBtn').onclick=async()=>{
+ $('loginBtn').disabled=true;
+ setMsg('در حال بررسی اطلاعات ورود...',true);
+ try{
+  const role=$('rolePick').value,c=$('classPick').value;
+  const selected=$('namePick').value,pw=$('password').value;
+  if(!pw)throw new Error('رمز عبور را وارد کنید.');
+  let email;
+  if(role==='teacher'||role.startsWith('support-')){
+   email=$('email').value.trim();
+   if(!email)throw new Error('ایمیل حساب را وارد کنید.');
+  }else{
+   if(!c||!selected)throw new Error('کلاس و نام خود را انتخاب کنید.');
+   email=selected+'@mathclasspro.test';
+  }
+
+  const {data,error}=await sb.auth.signInWithPassword({email,password:pw});
+  if(error)throw error;
+
+  const {data:pr,error:pe}=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
+  if(pe)throw pe;
+  if(!pr)throw new Error('برای این حساب پروفایل ثبت نشده است.');
+
+  if(role==='teacher'&&pr.role!=='teacher')throw new Error('این حساب، حساب معلم نیست.');
+
+  if(role.startsWith('support-')){
+   if(pr.role!=='support')throw new Error('این حساب، حساب پشتیبان نیست.');
+   const expected=role==='support-rahmati'?'rahmati':'hajibadi';
+   const detected=inferSupportKey({...pr,email:data.user.email});
+   if(!detected)throw new Error('هویت پشتیبان در پروفایل مشخص نشده است.');
+   if(detected!==expected)throw new Error('نوع حساب انتخاب‌شده صحیح نیست.');
+   supportIdentity=detected;
+  }
+
+  if(role==='chief'&&pr.role!=='chief')throw new Error('این حساب، حساب سرگروه کل نیست.');
+  if(role==='leader'&&pr.role!=='leader')throw new Error('این حساب، حساب سرگروه نیست.');
+
+  if(role!=='teacher'&&!role.startsWith('support-')&&profileClass(pr)!==classFor(c)){
+   throw new Error('کلاس حساب با کلاس انتخاب‌شده مطابقت ندارد.');
+  }
+
+  current=data.user;
+  profile=pr;
+  openApp();
+ }catch(e){
+  await sb.auth.signOut();
+  supportIdentity=null;
+  setMsg(e.message||'ورود انجام نشد.');
+ }finally{
+  $('loginBtn').disabled=false;
+ }
+};
+
+/* راه‌اندازی پنل */
+function openApp(){
+ $('loginView').classList.add('hidden');
+ $('appView').classList.remove('hidden');
+
+ const c=profileClass(profile);
+ $('welcome').textContent='خوش آمدی '+(profile.full_name||profile.name||'کاربر');
+
+ const roleLabel=isTeacher()?'معلم':
+ isSupport()?(supportIdentity==='rahmati'?'پشتیبان رحمتی':'پشتیبان حاجی‌آبادی'):profile.role;
+
+ $('userMeta').textContent=`نقش: ${roleLabel} | کلاس: ${c||'همه کلاس‌ها'}${profile.group_id?' | گروه: '+profile.group_id:''}`;
+
+ /* مقصد پیام‌ها: جلوگیری از پیام به خود */
+ [...$('supportRecipient').options].forEach(o=>{
+  o.hidden=(isTeacher()&&o.value==='teacher')||
+  (isSupport()&&(o.value===supportIdentity||o.value==='both'));
+ });
+
+ if(isTeacher())$('supportRecipient').value='rahmati';
+ else if(isSupport())$('supportRecipient').value=supportIdentity==='rahmati'?'hajibadi':'rahmati';
+ else $('supportRecipient').value='teacher';
+
+ /* گزارش‌ها: معلم فقط مشاهده؛ کاربران دیگر فقط ثبت */
+ $('reportForm').classList.toggle('hidden',!canCreateReport());
+ $('teacherReports').classList.toggle('hidden',!isTeacher());
+ $('reportUserMessage').classList.toggle('hidden',isTeacher());
+ $('reportDescription').textContent=isTeacher()
+ ?'شما می‌توانید گزارش‌های هر دو کلاس را مشاهده کنید.'
+ :'گزارش خود را ثبت کنید. گزارش به‌صورت خودکار در کلاس شما قرار می‌گیرد.';
+
+ $('reportClassWrap').classList.toggle('hidden',!isTeacher());
+ $('reportClass').value=isTeacher()?'۷۰۳':(c==='703'?'۷۰۳':'۷۰۴');
+ $('reportClass').disabled=!isTeacher();
+
+ if(!isTeacher()){
+  $('reportUserMessage').textContent='گزارش‌های ثبت‌شده فقط برای معلم قابل مشاهده هستند.';
+  fillGroups($('reportGroup'),c);
+  if(profile.role==='leader'&&profile.group_id){
+   $('reportGroup').value=String(Number(profile.group_id));
+   $('reportGroup').disabled=true;
+  }else $('reportGroup').disabled=false;
+ }else{
+  fillGroups($('reportGroup'),'۷۰۳');
+ }
+
+ $('scoreForm').classList.toggle('hidden',!roleCanScore());
+ $('homeworkForm').classList.toggle('hidden',!isTeacher());
+ $('homeworkFilterWrap').classList.toggle('hidden',!(isTeacher()||isSupport()));
+
+ $('scoreClass').value=isTeacher()?'۷۰۳':(c==='703'?'۷۰۳':'۷۰۴');
+ $('scoreClass').disabled=!isTeacher();
+ $('leadershipClass').value=isTeacher()?'۷۰۳':(c==='703'?'۷۰۳':'۷۰۴');
+ $('leadershipClass').disabled=!isTeacher();
+ fillGroups($('memberGroup'),$('leadershipClass').value);
+ if(isLeader()&&profile.group_id){
+  $('memberGroup').value=String(Number(profile.group_id));
+  $('memberGroup').disabled=true;
+ }
+ $('groupMemberForm').classList.toggle('hidden',!isLeader());
+ $('groupMemberDescription').textContent=isLeader()
+  ?'فقط اعضای گروه خودت را ثبت کن. کلاس و شماره گروه از حساب تو تعیین شده و قابل تغییر نیست.'
+  :'اعضای ثبت‌شده هر گروه در این قسمت نمایش داده می‌شوند.';
+ fillGroups($('scoreGroup'),$('scoreClass').value);
+
+ $('homeworkClassFilter').value='all';
+ fillGroups($('homeworkGroup'),$('homeworkClass').value,true);
+
+ updateLeadership();
+ loadReports();
+ loadScores();
+ loadHomework();
+ loadSupportMessages();
+}
+
+/* خروج */
+$('logoutBtn').onclick=async()=>{
+ await sb.auth.signOut();
+ current=null;profile=null;supportIdentity=null;
+ $('appView').classList.add('hidden');
+ $('loginView').classList.remove('hidden');
+ $('password').value='';
+};
+
+/* جابه‌جایی تب‌ها */
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));
+ document.querySelectorAll('.section').forEach(x=>x.classList.toggle('active',x.id===b.dataset.tab));
+ if(b.dataset.tab==='support')loadSupportMessages();
+ if(b.dataset.tab==='homework')loadHomework();
+ if(b.dataset.tab==='classes')updateLeadership();
+});
+
+/* نمایش سرگروه کل و سرگروه‌های هر کلاس */
+async function updateLeadership(){
+ const ownClass=profileClass(profile);
+ if(!isTeacher()&&ownClass)$('leadershipClass').value=ownClass==='703'?'۷۰۳':'۷۰۴';
+ const c=$('leadershipClass').value;
+ $('leadershipClass').disabled=!isTeacher();
+ $('classChief').innerHTML=`<article class="item"><h3>${esc(chiefs[c])}</h3><div class="meta">سرگروه کل کلاس ${esc(c)}</div></article>`;
+ $('classLeaders').innerHTML=roster[c].map((name,i)=>`
+ <article class="item">
+ <h3>${esc(name)}</h3>
+ <div class="meta">سرگروه گروه ${i+1} کلاس ${esc(c)}</div>
+ </article>`).join('');
+ fillGroups($('memberGroup'),c);
+ const canRegister=isLeader();
+ $('groupMemberForm').classList.toggle('hidden',!canRegister);
+ if(canRegister&&profile.group_id){
+  $('memberGroup').value=String(Number(profile.group_id));
+  $('memberGroup').disabled=true;
+  $('groupMemberDescription').textContent='فقط اعضای گروه خودت را ثبت کن. کلاس و شماره گروه از حساب تو تعیین شده و قابل تغییر نیست.';
+ }else{
+  $('memberGroup').disabled=false;
+  $('groupMemberDescription').textContent='اعضای ثبت‌شده هر گروه در این قسمت نمایش داده می‌شوند.';
+ }
+ await loadGroupMembers();
+}
+$('leadershipClass').onchange=updateLeadership;
+
+/* اعضای گروه‌ها: داده‌ها در Supabase ذخیره می‌شوند */
+async function loadGroupMembers(){
+ const c=$('leadershipClass').value;
+ const box=$('groupMembersList');
+ box.innerHTML='<div class="empty">در حال دریافت اعضای گروه‌ها...</div>';
+ const {data,error}=await sb.from('group_members').select('*')
+  .eq('class_id',classFor(c)).order('group_id',{ascending:true}).order('member_name',{ascending:true});
+ if(error){
+  box.innerHTML=`<div class="empty">خطا در دریافت اعضای گروه‌ها: ${esc(error.message)}<br>اگر جدول هنوز ساخته نشده، دستور SQL پایین صفحه را در Supabase اجرا کن.</div>`;
+  return;
+ }
+ box.innerHTML=groupsFor(c).map(g=>{
+  const members=(data||[]).filter(x=>Number(x.group_id)===g);
+  const memberHtml=members.length?members.map(m=>`<div class="row" style="margin-top:8px"><span>${esc(m.member_name)}</span>${isTeacher()?`<button class="danger" type="button" data-remove-member="${esc(m.id)}">حذف</button>`:''}</div>`).join(''):'<div class="meta">هنوز عضوی ثبت نشده است.</div>';
+  return `<article class="item"><h3>گروه ${g}</h3>${memberHtml}</article>`;
+ }).join('');
+ box.querySelectorAll('[data-remove-member]').forEach(btn=>btn.onclick=async()=>{
+  if(!isTeacher())return;
+  if(!confirm('این عضو از گروه حذف شود؟'))return;
+  btn.disabled=true;
+  const {error}=await sb.from('group_members').delete().eq('id',btn.dataset.removeMember);
+  if(error){alert('حذف عضو انجام نشد: '+error.message);btn.disabled=false;return;}
+  await loadGroupMembers();
+ });
+}
+$('addGroupMember').onclick=async()=>{
+ if(!isLeader()){
+  $('memberMsg').textContent='فقط سرگروه می‌تواند اعضای گروه خودش را ثبت کند.';
+  return;
+ }
+ const c=profileClass(profile);
+ const g=Number(profile.group_id);
+ const name=$('memberName').value.trim();
+ if(!['703','704'].includes(c)||!g||g<1||g>7){
+  $('memberMsg').textContent='کلاس یا شماره گروه حساب سرگروه کامل نیست؛ با معلم تماس بگیر.';
+  return;
+ }
+ if(!name){$('memberMsg').textContent='نام عضو را وارد کن.';return;}
+ const btn=$('addGroupMember');btn.disabled=true;$('memberMsg').textContent='در حال ذخیره...';
+ try{
+  const {error}=await sb.from('group_members').insert({class_id:c,group_id:g,member_name:name,created_by:current.id});
+  if(error)throw error;
+  $('memberName').value='';$('memberMsg').textContent='عضو گروه شما با موفقیت ثبت شد.';
+  await loadGroupMembers();
+ }catch(e){$('memberMsg').textContent='خطا در ثبت عضو: '+(e.message||'خطای نامشخص');}
+ finally{btn.disabled=false;}
+};
+
+/* گزارش‌ها: فقط معلم اجازه دریافت گزارش دارد */
+async function loadReports(){
+ if(!isTeacher()){
+  $('reportsList').innerHTML='';
+  return;
+ }
+ const c=teacherReportClass;
+ const {data,error}=await sb.from('work_reports').select('*')
+ .eq('class_id',classFor(c))
+ .order('created_at',{ascending:false}).limit(100);
+
+ if(error){
+  $('reportsList').innerHTML=`<div class="empty">خطا در دریافت گزارش‌ها: ${esc(error.message)}</div>`;
+  return;
+ }
+
+ const {data:members,error:membersError}=await sb.from('group_members').select('group_id,member_name')
+  .eq('class_id',classFor(c)).order('member_name',{ascending:true});
+ if(membersError){
+  $('reportsList').innerHTML=`<div class="empty">گزارش‌ها دریافت شدند، اما دریافت اعضای گروه‌ها با خطا روبه‌رو شد: ${esc(membersError.message)}</div>`;
+  return;
+ }
+ const membersByGroup={};
+ (members||[]).forEach(m=>{
+  const key=String(m.group_id);
+  (membersByGroup[key] ||= []).push(m.member_name);
+ });
+ $('reportsList').innerHTML=data?.length?data.map(x=>{
+  const groupKey=String(x.group_id??'');
+  const names=membersByGroup[groupKey]||[];
+  const membersLabel=names.length?names.map(esc).join('، '):'هنوز عضوی برای این گروه ثبت نشده است.';
+  return `
+ <article class="item">
+ <h3>${esc(x.title||'گزارش بدون عنوان')}</h3>
+ <div>${esc(x.content||'')}</div>
+ <div class="meta">کلاس ${esc(c)} · گروه ${esc(String(x.group_id??'—'))} · ${fmt(x.created_at)}</div>
+ <div class="meta" style="margin-top:8px"><b>اعضای گروه گزارش‌دهنده:</b> ${membersLabel}</div>
+ </article>`;
+ }).join('')
+ :'<div class="empty">هنوز گزارشی برای این کلاس ثبت نشده است.</div>';
+}
+$('show703').onclick=()=>{
+ teacherReportClass='۷۰۳';
+ $('show703').classList.remove('secondary');
+ $('show704').classList.add('secondary');
+ loadReports();
+};
+$('show704').onclick=()=>{
+ teacherReportClass='۷۰۴';
+ $('show704').classList.remove('secondary');
+ $('show703').classList.add('secondary');
+ loadReports();
+};
+
+/* ثبت گزارش: کلاس به‌صورت خودکار از پروفایل تعیین می‌شود */
+$('saveReport').onclick=async()=>{
+ if(!canCreateReport()){
+  alert('شما اجازه ثبت گزارش ندارید.');
+  return;
+ }
+
+ const c=profileClass(profile);
+ const title=$('reportTitle').value.trim();
+ const content=$('reportContent').value.trim();
+ const group=profile.role==='leader'&&profile.group_id
+ ?String(Number(profile.group_id))
+ :$('reportGroup').value;
+
+ if(!['703','704'].includes(c)){
+  alert('کلاس حساب شما مشخص نیست.');
+  return;
+ }
+ if(!title||!content){
+  alert('عنوان و شرح گزارش را وارد کنید.');
+  return;
+ }
+ if(!group){
+  alert('گروه را انتخاب کنید.');
+  return;
+ }
+
+ const btn=$('saveReport');
+ btn.disabled=true;
+ try{
+  const {error}=await sb.from('work_reports').insert({
+   user_id:current.id,
+   class_id:c,
+   group_id:group,
+   title,content,status:'submitted'
+  });
+  if(error)throw error;
+
+  $('reportTitle').value='';
+  $('reportContent').value='';
+  alert('گزارش با موفقیت در کلاس خودتان ثبت شد.');
+ }catch(e){
+  alert('ثبت گزارش انجام نشد: '+e.message);
+ }finally{
+  btn.disabled=false;
+ }
+};
+
+/* امتیازها */
+$('scoreClass').onchange=()=>{
+ fillGroups($('scoreGroup'),$('scoreClass').value);
+ loadScores();
+};
+
+async function loadScores(){
+ const c=$('scoreClass').value;
+ if(!allowedClass(c))return;
+
+ const {data,error}=await sb.from('group_scores').select('*')
+ .eq('class_id',classFor(c))
+ .order('created_at',{ascending:false}).limit(200);
+
+ if(error){
+  $('scoresList').innerHTML=`<div class="empty">خطا در دریافت امتیازها: ${esc(error.message)}</div>`;
+  return;
+ }
+
+ $('scoresCount').textContent=(data||[]).length;
+ const sums={};
+ (data||[]).forEach(x=>{
+  const g=String(x.group_id);
+  sums[g]=(sums[g]||0)+Number(x.points||0);
+ });
+
+ const ranking=Object.entries(sums).sort((a,b)=>b[1]-a[1]);
+ const rankHtml=ranking.length
+ ?'<div class="item"><h3>رتبه‌بندی گروه‌ها</h3>'+
+ ranking.map(([g,n],i)=>`<div class="meta">${i+1}. گروه ${esc(g)}: <b style="color:var(--cyan)">${n}</b> امتیاز</div>`).join('')+'</div>'
+ :'';
+
+ $('scoresList').innerHTML=rankHtml+(data?.length?data.map(x=>`
+ <article class="item">
+ <h3>گروه ${esc(String(x.group_id))} · ${Number(x.points)>0?'+':''}${esc(String(x.points))} امتیاز</h3>
+ <div>${esc(x.reason||'بدون توضیح')}</div>
+ <div class="meta">${fmt(x.created_at)}</div>
+ </article>`).join('')
+ :'<div class="empty">هنوز امتیازی برای این کلاس ثبت نشده است.</div>');
+}
+
+$('saveScore').onclick=async()=>{
+ if(!isTeacher()){
+  alert('فقط معلم اجازه ثبت امتیاز دارد.');
+  return;
+ }
+ const c=$('scoreClass').value;
+ const points=Number($('scorePoints').value);
+ const reason=$('scoreReason').value.trim();
+ const group=$('scoreGroup').value;
+
+ if(!Number.isFinite(points)||!reason){
+  alert('امتیاز و دلیل آن را وارد کنید.');
+  return;
+ }
+
+ const {error}=await sb.from('group_scores').insert({
+  class_id:classFor(c),group_id:group,points,reason,created_by:current.id
+ });
+ if(error){
+  alert('ثبت امتیاز انجام نشد: '+error.message);
+  return;
+ }
+ $('scoreReason').value='';
+ loadScores();
+};
+
+/* تکالیف */
+$('homeworkClass').onchange=()=>{
+  const c=$('homeworkClass').value;
+  fillGroups($('homeworkGroup'),c==='both'?'۷۰۳':c,true);
+};
+$('homeworkClassFilter').onchange=loadHomework;
+
+async function loadHomework(){
+ let q=sb.from('assignments').select('*')
+ .order('created_at',{ascending:false}).limit(100);
+
+ if(isTeacher()||isSupport()){
+  const selected=$('homeworkClassFilter')?.value||'all';
+  if(selected!=='all')q=q.eq('class_id',selected);
+ }else{
+  const c=profileClass(profile);
+  q=q.eq('class_id',c);
+  if(profile.role==='leader'&&profile.group_id){
+   q=q.or(`group_id.is.null,group_id.eq.${Number(profile.group_id)}`);
+  }
+ }
+
+ const {data,error}=await q;
+ if(error){
+  $('homeworkList').innerHTML=`<div class="empty">خطا در دریافت تکالیف: ${esc(error.message)}</div>`;
+  return;
+ }
+
+ $('homeworkList').innerHTML=data?.length?data.map(x=>`
+ <article class="item">
+ <h3>${esc(x.title||'تکلیف')}</h3>
+ <div>${esc(x.description||'')}</div>
+ <div class="meta">کلاس ${esc(String(x.class_id||'—'))} · ${x.group_id?'گروه '+esc(String(x.group_id)):'همه گروه‌ها'} · مهلت: ${esc(x.due_shamsi || fmt(x.due_at))}</div>
+ </article>`).join('')
+ :'<div class="empty">تکلیفی ثبت نشده است.</div>';
+}
+
+$('saveHomework').onclick=async()=>{
+ if(!isTeacher()){
+  alert('فقط معلم اجازه ثبت تکلیف دارد.');
+  return;
+ }
+
+ const selectedClass=$('homeworkClass').value;
+const classes=selectedClass==='both'
+  ? ['۷۰۳','۷۰۴']
+  : [selectedClass];
+
+const title=$('homeworkTitle').value.trim();
+const description=$('homeworkDescription').value.trim();
+const group=$('homeworkGroup').value;
+const day=$('homeworkDueDay').value;
+const month=$('homeworkDueMonth').value;
+const year=$('homeworkDueYear').value;
+
+const due = day && month
+  ? `${year}/${month}/${day}`
+  : null;
+
+ if(!title||!description){
+  alert('عنوان و توضیحات تکلیف را وارد کنید.');
+  return;
+ }
+ const btn=$('saveHomework');
+ btn.disabled=true;
+ try{
+  const rows=classes.map(c=>({
+  title,
+  description,
+  class_id:classFor(c),
+  group_id:group?Number(group):null,
+  created_by:current.id,
+ due_shamsi:due,
+}));
+
+const {error}=await sb.from('assignments').insert(rows);
+if(error)throw error;
+
+  $('homeworkTitle').value='';
+  $('homeworkDescription').value='';
+  $('homeworkDueDay').value='';
+  $('homeworkDueMonth').value='';
+  $('homeworkDueYear').value='1405';
+alert(
+  selectedClass==='both'
+    ? 'تکلیف با موفقیت برای هر دو کلاس ثبت شد.'
+    : 'تکلیف با موفقیت ثبت شد.'
+);
+  await loadHomework();
+ }catch(e){
+  alert('ثبت تکلیف انجام نشد: '+e.message);
+ }finally{
+  btn.disabled=false;
+ }
+};
+
+/* هوش مصنوعی عمداً غیرفعال است.
+   هیچ درخواست یا تابعی در Supabase برای AI اجرا نمی‌شود. */
+
+/* پیام‌رسانی */
+function getSenderName(){
+ return profile.full_name||profile.name||current.email||'کاربر';
+}
+
+$('sendSupport').onclick=async()=>{
+ const content=$('supportContent').value.trim();
+ const recipient=$('supportRecipient').value;
+
+ if(!content){
+  alert('متن پیام را وارد کنید.');
+  return;
+ }
+ if(isTeacher()&&recipient==='teacher'){
+  alert('امکان ارسال پیام به حساب خودتان وجود ندارد.');
+  return;
+ }
+ if(isSupport()&&(recipient===supportIdentity||recipient==='both')){
+  alert('نمی‌توانید به حساب خودتان پیام بفرستید.');
+  return;
+ }
+
+ const targets=recipient==='both'?['rahmati','hajibadi']:[recipient];
+ const filteredTargets=isSupport()?targets.filter(key=>key!==supportIdentity):targets;
+
+ if(!filteredTargets.length){
+  alert('مقصد پیام را انتخاب کنید.');
+  return;
+ }
+
+ const rows=filteredTargets.map(key=>({
+  thread_id:crypto.randomUUID(),
+  sender_id:current.id,
+  sender_name:getSenderName(),
+  sender_role:profile.role,
+  recipient_key:key,
+  content
+ }));
+
+ const {error}=await sb.from('support_messages').insert(rows);
+ if(error){
+  alert('ارسال پیام انجام نشد: '+error.message);
+  return;
+ }
+
+ $('supportContent').value='';
+ alert('پیام ارسال شد.');
+ loadSupportMessages();
+};
+
+async function loadSupportMessages(){
+ if(!current||!profile)return;
+
+ let query=sb.from('support_messages').select('*')
+ .order('created_at',{ascending:true}).limit(200);
+
+ if(isTeacher()||isSupport()){
+  query=query.or(`sender_id.eq.${current.id},recipient_key.eq.${getRecipientKey()}`);
+ }else{
+  query=query.or(`sender_id.eq.${current.id},recipient_key.eq.user:${current.id}`);
+ }
+
+ const {data,error}=await query;
+ if(error){
+  $('supportMessages').innerHTML=`<div class="empty">خطا در دریافت پیام‌ها: ${esc(error.message)}</div>`;
+  return;
+ }
+
+ if(!data?.length){
+  $('supportMessages').innerHTML='<div class="empty">هنوز پیامی وجود ندارد.</div>';
+  return;
+ }
+
+ $('supportMessages').innerHTML=data.map(x=>{
+  const canReply=(isTeacher()||isSupport())&&
+  ['teacher','rahmati','hajibadi'].includes(x.recipient_key)&&
+  x.sender_id!==current.id;
+
+  return `<article class="item">
+   <h3>${esc(x.sender_name||'کاربر')} — ${esc(x.sender_role||'')}</h3>
+   <div>${esc(x.content)}</div>
+   <div class="meta">شناسه گفتگو: ${esc(String(x.thread_id||''))} · ${fmt(x.created_at)}</div>
+   ${canReply?`<button class="secondary" data-reply-user="${esc(x.sender_id)}" data-reply-thread="${esc(x.thread_id)}">پاسخ به این پیام</button>`:''}
+  </article>`;
+ }).join('');
+
+ document.querySelectorAll('[data-reply-user]').forEach(btn=>{
+  btn.onclick=()=>{
+   replyTarget=btn.dataset.replyUser;
+   replyThread=btn.dataset.replyThread;
+   $('supportReplyBox').classList.remove('hidden');
+   $('replyInfo').textContent='در حال پاسخ به پیام این کاربر';
+   $('supportReplyText').focus();
+  };
+ });
+}
+
+$('sendReply').onclick=async()=>{
+ if(!(isTeacher()||isSupport()))return;
+ if(!replyTarget||!replyThread){
+  alert('ابتدا یک پیام را برای پاسخ انتخاب کنید.');
+  return;
+ }
+
+ const content=$('supportReplyText').value.trim();
+ if(!content){
+  alert('متن پاسخ را وارد کنید.');
+  return;
+ }
+
+ const {error}=await sb.from('support_messages').insert({
+  thread_id:replyThread,
+  sender_id:current.id,
+  sender_name:getSenderName(),
+  sender_role:profile.role,
+  recipient_key:'user:'+replyTarget,
+  content
+ });
+
+ if(error){
+  alert('ارسال پاسخ انجام نشد: '+error.message);
+  return;
+ }
+
+ $('supportReplyText').value='';
+ $('supportReplyBox').classList.add('hidden');
+ replyTarget=null;
+ replyThread=null;
+ loadSupportMessages();
+};
+
+$('cancelReply').onclick=()=>{
+ replyTarget=null;
+ replyThread=null;
+ $('supportReplyBox').classList.add('hidden');
+ $('supportReplyText').value='';
+};
+
+/* خروج امن از نشست قبلی */
+(async()=>{
+ const {data}=await sb.auth.getSession();
+ if(data.session)await sb.auth.signOut();
+})();
+
+/* نصب‌پذیری PWA */
+let deferredInstallPrompt=null;
+
+window.addEventListener('beforeinstallprompt',event=>{
+ event.preventDefault();
+ deferredInstallPrompt=event;
+ $('installBtn')?.classList.remove('hidden');
+});
+
+$('installBtn')?.addEventListener('click',async()=>{
+ if(!deferredInstallPrompt){
+  alert('برای نصب، سایت را با Chrome و از نشانی HTTPS باز کنید.');
+  return;
+ }
+ deferredInstallPrompt.prompt();
+ await deferredInstallPrompt.userChoice;
+ deferredInstallPrompt=null;
+ $('installBtn').classList.add('hidden');
+});
+
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
+ window.addEventListener('load',()=>{
+  navigator.serviceWorker.register('./sw.js')
+  .catch(err=>console.warn('Service worker registration failed:',err));
+ });
+}
+
+/* پس‌زمینه متحرک */
+(()=>{
+ const box=$('particles');
+ for(let i=0;i<32;i++){
+  const p=document.createElement('span');
+  p.className='particle';
+  p.style.left=Math.random()*100+'%';
+  p.style.animationDuration=(12+Math.random()*22)+'s';
+  p.style.animationDelay=(-Math.random()*25)+'s';
+  p.style.opacity=(.15+Math.random()*.35).toString();
+  p.style.transform=`scale(${.5+Math.random()*1.5})`;
+  box.appendChild(p);
+ }
+})();
+</script>
+</body>
+</html>
