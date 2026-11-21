@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imam-reza-math-shell-v6';
+const CACHE_NAME = 'imam-reza-math-shell-v7';
 const BASE = '/riazi-school/';
 const SHELL = [
   BASE,
