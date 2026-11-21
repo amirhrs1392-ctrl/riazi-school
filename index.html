@@ -515,14 +515,38 @@ function setMsg(t,ok=false){
  $('loginMsg').textContent=t;
 }
 
-/* تشخیص هویت پشتیبان */
+/* تشخیص هویت پشتیبان — پشتیبانی از نوشتار فارسی/عربی و نام فیلدهای متداول پروفایل */
+function normalizeSupportText(value){
+ return String(value??'')
+  .normalize('NFKC')
+  .replace(/[يى]/g,'ی')
+  .replace(/ك/g,'ک')
+  .replace(/ـ/g,'')
+  .replace(/[\u064B-\u065F\u0670]/g,'')
+  .toLowerCase()
+  .replace(/[\s\u200c\u200f\u202a-\u202e_-]+/g,'');
+}
 function inferSupportKey(p){
- const key=String(p?.support_key||'').trim().toLowerCase();
- if(key==='rahmati'||key==='hajibadi')return key;
- const raw=[p?.full_name,p?.name,p?.email].filter(Boolean).join(' ').toLowerCase().replace(/[\s‌_-]/g,'');
- if(raw.includes('رحمتی')||raw.includes('rahmati'))return 'rahmati';
- if(raw.includes('حاجی')||raw.includes('آبادی')||raw.includes('hajabadi')||raw.includes('hajibadi'))return 'hajibadi';
- return null;
+ if(!p||typeof p!=='object')return null;
+ const fields=[
+  'support_key','support_identity','support_type','support_name',
+  'support_full_name','support_display_name','full_name','fullName',
+  'display_name','name','username','email','first_name','last_name',
+  'family_name','surname','نام','نام_خانوادگی','شناسه_پشتیبانی'
+ ];
+ const values=[];
+ for(const field of fields){if(p[field]!=null)values.push(p[field]);}
+ for(const meta of [p.user_metadata,p.raw_user_meta_data,p.metadata]){
+  if(meta&&typeof meta==='object'){
+   for(const field of fields){if(meta[field]!=null)values.push(meta[field]);}
+  }
+ }
+ const raw=values.map(normalizeSupportText).filter(Boolean);
+ const rahmati=raw.some(v=>v.includes('rahmati')||v.includes('رحمتی'));
+ const hajibadi=raw.some(v=>v.includes('hajibadi')||v.includes('hajabadi')||v.includes('حاجیآبادی')||v.includes('حاجیابادی'));
+ // اگر داده‌های پروفایل دو هویت متفاوت را نشان دهند، هویت را حدس نمی‌زنیم.
+ if(rahmati===hajibadi)return null;
+ return rahmati?'rahmati':'hajibadi';
 }
 function getRecipientKey(){return isTeacher()?'teacher':supportIdentity}
 
