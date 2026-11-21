@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -20,6 +21,38 @@ type Profile = {
   full_name?: string | null;
 };
 type Action = { name: string; args: Record<string, unknown> };
+
+function b64url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+function fromB64url(value: string): Uint8Array {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
+  return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+}
+async function signConfirmation(payload: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return b64url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload))));
+}
+async function makeConfirmationToken(action: Action, userId: string, secret: string): Promise<string> {
+  const payload = b64url(new TextEncoder().encode(JSON.stringify({ action, userId, exp: Date.now() + 5 * 60 * 1000 })));
+  return `${payload}.${await signConfirmation(payload, secret)}`;
+}
+async function verifyConfirmationToken(token: unknown, action: Action, userId: string, secret: string): Promise<boolean> {
+  if (typeof token !== "string") return false;
+  const [payload, signature, extra] = token.split(".");
+  if (!payload || !signature || extra) return false;
+  const expected = await signConfirmation(payload, secret);
+  const a = new TextEncoder().encode(signature), b = new TextEncoder().encode(expected);
+  if (a.length !== b.length) return false;
+  let diff = 0; for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  if (diff !== 0) return false;
+  try {
+    const data = JSON.parse(new TextDecoder().decode(fromB64url(payload)));
+    return data.userId === userId && Number(data.exp) > Date.now() && JSON.stringify(data.action) === JSON.stringify(action);
+  } catch { return false; }
+}
 
 const tools = [
   {
@@ -64,8 +97,8 @@ const tools = [
       description: { type: "string" },
       class_ids: { type: "array", items: { type: "integer", enum: [703, 704] }, minItems: 1, maxItems: 2 },
       group_id: { type: ["integer", "null"], enum: [1, 2, 3, 4, 5, 6, 7, null] },
-      due_shamsi: { type: ["string", "null"] },
-    }, required: ["title", "description", "class_ids", "group_id", "due_shamsi"] },
+      due_at: { type: ["string", "null"] },
+    }, required: ["title", "description", "class_ids", "group_id", "due_at"] },
   },
   {
     type: "function", name: "create_report", strict: true,
@@ -118,6 +151,7 @@ function instructionsFor(profile: Profile): string {
 async function callOpenAI(input: unknown, instructions: string, apiKey: string, previousResponseId?: string) {
   const payload: Record<string, unknown> = {
     model: model(), instructions, input, tools, tool_choice: "auto", parallel_tool_calls: false,
+
   };
   if (previousResponseId) payload.previous_response_id = previousResponseId;
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -137,7 +171,7 @@ async function runReadTool(name: string, args: Record<string, unknown>, db: Retu
 
   if (name === "read_assignments") {
     if (!["teacher", "chief", "leader"].includes(profile.role)) return { error: "نمایش تکالیف برای نقش پشتیبان از طریق دستیار فعال نیست؛ اما می‌توانی سؤال‌های ریاضی بپرسی." };
-    let q = db.from("assignments").select("id,title,description,class_id,group_id,due_shamsi,created_at").order("created_at", { ascending: false }).limit(limit);
+    let q = db.from("assignments").select("id,title,description,class_id,group_id,due_at,created_at").order("created_at", { ascending: false }).limit(limit);
     const requested = args.class_id;
     if (profile.role === "leader") {
       q = q.eq("class_id", profile.class_id).or(`group_id.is.null,group_id.eq.${Number(profile.group_id)}`);
@@ -180,7 +214,9 @@ async function runReadTool(name: string, args: Record<string, unknown>, db: Retu
 
   if (name === "read_group_members") {
     if (!["teacher", "chief", "leader"].includes(profile.role)) return { error: "نقش شما اجازه مشاهده فهرست اعضای گروه‌ها را ندارد." };
-    const classId = Number(args.class_id);
+    const classId = profile.role === "leader"
+      ? Number(profile.class_id)
+      : Number(args.class_id);
     assertClassForRole(profile, classId);
     let q = db.from("group_members").select("id,class_id,group_id,member_name,created_at").eq("class_id", String(classId)).order("group_id", { ascending: true }).order("member_name", { ascending: true }).limit(100);
     if (profile.role === "leader") q = q.eq("group_id", profile.group_id);
@@ -200,12 +236,14 @@ function validatePendingAction(action: Action, profile: Profile): Action {
     const description = cleanText(a.description, 2500);
     const classes = Array.isArray(a.class_ids) ? [...new Set(a.class_ids.map(Number))] : [];
     const group = a.group_id === null ? null : Number(a.group_id);
-    const due = a.due_shamsi === null ? null : cleanText(a.due_shamsi, 20);
+    const due = a.due_at === null ? null : cleanText(a.due_at, 40);
     if (!title || !description) throw new Error("عنوان و توضیحات تکلیف باید کامل باشد.");
     if (!classes.length || classes.some(c => !integerIn(c, allowedClasses))) throw new Error("کلاس تکلیف معتبر نیست.");
     if (group !== null && !integerIn(group, allowedGroups)) throw new Error("شماره گروه باید بین ۱ تا ۷ باشد.");
-    if (due && !/^14\d{2}[/-]\d{1,2}[/-]\d{1,2}$/.test(due)) throw new Error("مهلت باید به شکل سال/ماه/روز شمسی باشد.");
-    return { name: action.name, args: { title, description, class_ids: classes, group_id: group, due_shamsi: due } };
+    if (due && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/.test(due) || Number.isNaN(Date.parse(due)))) {
+      throw new Error("مهلت باید به شکل تاریخ و ساعت معتبر ISO همراه منطقه زمانی باشد.");
+    }
+    return { name: action.name, args: { title, description, class_ids: classes, group_id: group, due_at: due } };
   }
   if (action.name === "create_report") {
     if (profile.role !== "leader") throw new Error("ثبت گزارش از طریق دستیار فقط برای سرگروه مجاز است.");
@@ -227,99 +265,217 @@ function validatePendingAction(action: Action, profile: Profile): Action {
   throw new Error("این نوع عملیات در سامانه مجاز نیست.");
 }
 
-async function executeApprovedAction(action: Action, db: ReturnType<typeof createClient>, profile: Profile) {
-  if (action.name === "create_assignment") {
-    const rows = (action.args.class_ids as number[]).map(classId => ({
-      title: action.args.title, description: action.args.description,
-      class_id: classId, group_id: action.args.group_id,
-      created_by: profile.id, due_shamsi: action.args.due_shamsi,
+async function executeAction(
+  action: Action,
+  db: ReturnType<typeof createClient>,
+  profile: Profile,
+  userId: string,
+) {
+  const checked = validatePendingAction(action, profile);
+  const a = checked.args;
+
+  if (checked.name === "create_assignment") {
+    const rows = (a.class_ids as number[]).map(class_id => ({
+      title: a.title,
+      description: a.description,
+      class_id,
+      group_id: a.group_id,
+      due_at: a.due_at,
+      created_by: userId,
     }));
-    const { data, error } = await db.from("assignments").insert(rows).select("id,title,class_id,group_id,due_shamsi");
+    const { data, error } = await db.from("assignments").insert(rows).select("id,title,class_id");
     if (error) throw new Error(error.message);
-    return { message: `تکلیف «${action.args.title}» با موفقیت برای ${rows.length === 2 ? "هر دو کلاس ۷۰۳ و ۷۰۴" : `کلاس ${rows[0].class_id}`} ثبت شد.`, records: data || [] };
+    return { success: true, message: "تکلیف ثبت شد.", data };
   }
-  if (action.name === "create_report") {
-    if (profile.role !== "leader") throw new Error("ثبت گزارش فقط برای سرگروه مجاز است.");
+
+  if (checked.name === "create_report") {
     const { data, error } = await db.from("work_reports").insert({
-      user_id: profile.id, class_id: profile.class_id, group_id: profile.group_id,
-      title: action.args.title, content: action.args.content,
-    }).select("id,title,class_id,group_id").single();
+      user_id: userId,
+      class_id: profile.class_id,
+      group_id: profile.group_id,
+      title: a.title,
+      content: a.content,
+    }).select("id,title").single();
     if (error) throw new Error(error.message);
-    return { message: `گزارش «${action.args.title}» برای کلاس ${profile.class_id} و گروه ${profile.group_id} ثبت شد.`, record: data };
+    return { success: true, message: "گزارش ثبت شد.", data };
   }
-  if (action.name === "add_score") {
+
+  if (checked.name === "add_score") {
     const { data, error } = await db.from("group_scores").insert({
-      class_id: action.args.class_id, group_id: action.args.group_id,
-      points: action.args.points, reason: action.args.reason, created_by: profile.id,
-    }).select("id,class_id,group_id,points,reason").single();
+      class_id: a.class_id,
+      group_id: a.group_id,
+      points: a.points,
+      reason: a.reason,
+      created_by: userId,
+    }).select("id,class_id,group_id,points").single();
     if (error) throw new Error(error.message);
-    return { message: `${action.args.points} امتیاز برای گروه ${action.args.group_id} کلاس ${action.args.class_id} ثبت شد.`, record: data };
+    return { success: true, message: "امتیاز ثبت شد.", data };
   }
+
   throw new Error("عملیات ناشناخته است.");
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+  if (req.method !== "POST") {
+    return json({ error: "فقط درخواست POST پذیرفته می‌شود." }, 405);
+  }
 
   try {
+    const origin = req.headers.get("origin");
+    if (origin && origin !== corsHeaders["Access-Control-Allow-Origin"]) {
+      return json({ error: "مبدأ درخواست مجاز نیست." }, 403);
+    }
+
     const authorization = req.headers.get("Authorization") || "";
-    if (!authorization.startsWith("Bearer ")) return json({ error: "برای استفاده از دستیار ابتدا وارد حساب شو." }, 401);
+    const token = authorization.replace(/^Bearer\s+/i, "");
+    if (!token) return json({ error: "ابتدا وارد حساب کاربری شو." }, 401);
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const publishableMap = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
-    let defaultPublishable = "";
-    if (publishableMap) { try { defaultPublishable = JSON.parse(publishableMap)?.default || ""; } catch { defaultPublishable = ""; } }
-    const supabaseAnon = defaultPublishable || Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!supabaseUrl || !supabaseAnon) return json({ error: "اتصال امن پایگاه داده روی سرور تنظیم نشده است." }, 500);
-    if (!apiKey) return json({ error: "کلید امن هوش مصنوعی هنوز در Secrets سرور تنظیم نشده است." }, 503);
+    const publishableKeys = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
-    const db = createClient(supabaseUrl, supabaseAnon, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: authData, error: authError } = await db.auth.getUser();
-    if (authError || !authData.user) return json({ error: "نشست ورود معتبر نیست؛ دوباره وارد سامانه شو." }, 401);
-    const { data: profile, error: profileError } = await db.from("profiles").select("id,role,class_id,group_id,full_name").eq("id", authData.user.id).single();
-    if (profileError || !profile) return json({ error: "پروفایل حساب پیدا نشد یا دسترسی به آن مجاز نیست." }, 403);
-
-    const body = await req.json().catch(() => ({}));
-
-    // تغییرهای نوشتنی تنها در فراخوانی جداگانه و پس از کلیک صریح کاربر اجرا می‌شوند.
-    if (body?.approve_action) {
-      const action = validatePendingAction(body.approve_action as Action, profile as Profile);
-      const result = await executeApprovedAction(action, db, profile as Profile);
-      return json({ ...result, success: true });
-    }
-
-    const messages = Array.isArray(body?.messages) ? body.messages.slice(-12) : [];
-    const safeMessages = messages
-      .filter((m: any) => ["user", "assistant"].includes(m?.role))
-      .map((m: any) => ({ role: m.role, content: cleanText(m.content, 2500) }))
-      .filter((m: any) => m.content);
-    if (!safeMessages.length) return json({ error: "پیام خالی است." }, 400);
-
-    const instructions = instructionsFor(profile as Profile);
-    let result = await callOpenAI(safeMessages, instructions, apiKey);
-    for (let round = 0; round < 4; round++) {
-      const calls = (result.output || []).filter((item: any) => item.type === "function_call");
-      if (!calls.length) break;
-      const outputs: any[] = [];
-      for (const call of calls) {
-        let args: Record<string, unknown> = {};
-        try { args = JSON.parse(call.arguments || "{}"); } catch { outputs.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify({ error: "پارامترهای ابزار قابل خواندن نبود." }) }); continue; }
-        if (["create_assignment", "create_report", "add_score"].includes(call.name)) {
-          const pending = validatePendingAction({ name: call.name, args }, profile as Profile);
-          return json({
-            answer: "جزئیات درخواست آماده شده است. لطفاً پیش‌نمایش را بررسی کن و فقط در صورت درست بودن روی «تأیید و ثبت» بزن.",
-            pending_action: pending,
-          });
-        }
-        const output = await runReadTool(call.name, args, db, profile as Profile);
-        outputs.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(output) });
+    let publicKey = anonKey || "";
+    if (publishableKeys) {
+      try {
+        publicKey = JSON.parse(publishableKeys).default || publicKey;
+      } catch {
+        // پشتیبانی از کلید عمومی قدیمی
       }
-      result = await callOpenAI(outputs, instructions, apiKey, result.id);
     }
-    return json({ answer: String(result.output_text || "پاسخی تولید نشد.") });
+
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!supabaseUrl || !publicKey || !openaiKey) {
+      return json({ error: "تنظیمات سرور کامل نیست. مدیر سامانه باید Secrets را بررسی کند." }, 500);
+    }
+
+    const db = createClient(supabaseUrl, publicKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { data: authData, error: authError } = await db.auth.getUser(token);
+    if (authError || !authData.user) {
+      return json({ error: "نشست کاربری معتبر نیست؛ دوباره وارد شو." }, 401);
+    }
+
+    const userId = authData.user.id;
+    const { data: profileData, error: profileError } = await db
+      .from("profiles")
+      .select("id,role,class_id,group_id,full_name")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profileError || !profileData) {
+      return json({ error: "پروفایل کاربر پیدا نشد یا دسترسی لازم وجود ندارد." }, 403);
+    }
+
+    const profile = profileData as Profile;
+    if (!["teacher", "chief", "leader", "support"].includes(profile.role)) {
+      return json({ error: "نقش کاربری معتبر نیست." }, 403);
+    }
+
+    const body = await req.json();
+    const approve = body?.approve_action;
+
+    if (approve) {
+      if (typeof approve.name !== "string" || !approve.args || typeof approve.args !== "object") {
+        return json({ error: "درخواست تأیید معتبر نیست." }, 400);
+      }
+      const confirmationSecret = Deno.env.get("CONFIRMATION_SECRET") || "";
+      const approvedAction = { name: approve.name, args: approve.args } as Action;
+      if (confirmationSecret.length < 32 || !(await verifyConfirmationToken(approve.confirmation_token, approvedAction, userId, confirmationSecret))) {
+        return json({ error: "تأیید معتبر نیست یا منقضی شده است. پیش‌نمایش را دوباره ایجاد کن." }, 403);
+      }
+      const result = await executeAction(
+        approvedAction,
+        db,
+        profile,
+        userId,
+      );
+      return json({ result });
+    }
+
+    const incoming = Array.isArray(body?.messages) ? body.messages : body?.message;
+    const message = Array.isArray(incoming)
+      ? incoming.slice(-12).map((item: any) => ({
+          role: item?.role === "assistant" ? "assistant" : "user",
+          content: cleanText(item?.content, 5000),
+        })).filter((item: any) => item.content)
+      : cleanText(incoming, 5000);
+    if (!message || (Array.isArray(message) && message.length === 0)) {
+      return json({ error: "پیام خالی است." }, 400);
+    }
+
+    let response = await callOpenAI(message, instructionsFor(profile), openaiKey);
+    let pendingAction: Action | null = null;
+
+    for (let round = 0; round < 4; round++) {
+      const calls = (response.output || []).filter(
+        (item: any) => item.type === "function_call",
+      );
+
+      if (!calls.length) break;
+
+      const outputs = [];
+      for (const call of calls) {
+        const args = JSON.parse(call.arguments || "{}");
+        let result: unknown;
+
+        if (["read_assignments", "read_reports", "read_scores", "read_group_members"].includes(call.name)) {
+          result = await runReadTool(call.name, args, db, profile);
+        } else {
+          const checked = validatePendingAction(
+            { name: call.name, args },
+            profile,
+          );
+          pendingAction = checked;
+          result = {
+            pending: true,
+            message: "این عملیات هنوز ثبت نشده است. ابتدا پیش‌نمایش را به کاربر نشان بده و منتظر تأیید صریح او بمان.",
+            action: checked,
+          };
+        }
+
+        outputs.push({
+          type: "function_call_output",
+          call_id: call.call_id,
+          output: JSON.stringify(result),
+        });
+      }
+
+      response = await callOpenAI(
+        outputs,
+        instructionsFor(profile),
+        openaiKey,
+        response.id,
+      );
+    }
+
+    if (pendingAction) {
+      const confirmationSecret = Deno.env.get("CONFIRMATION_SECRET") || "";
+      if (confirmationSecret.length < 32) throw new Error("مدیر سامانه باید Secret با نام CONFIRMATION_SECRET و حداقل ۳۲ نویسه تنظیم کند.");
+      (pendingAction as any).confirmation_token = await makeConfirmationToken(pendingAction, userId, confirmationSecret);
+    }
+
+    const answer = (response.output || [])
+      .filter((item: any) => item.type === "message")
+      .flatMap((item: any) => item.content || [])
+      .filter((part: any) => part.type === "output_text")
+      .map((part: any) => part.text)
+      .join("\n");
+
+    return json({
+      answer: answer || "پاسخی دریافت نشد؛ لطفاً دوباره تلاش کن.",
+      pending_action: pendingAction,
+      response_id: response.id,
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "خطای داخلی سرویس";
-    return json({ error: message }, 400);
+    console.error("site-assistant error:", error);
+    return json({
+      error: error instanceof Error ? error.message : "خطای ناشناخته سرور",
+    }, 400);
   }
 });

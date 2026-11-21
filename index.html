@@ -1268,7 +1268,7 @@ function assistantActionSummary(action){
  const a=action?.args||{};
  if(action?.name==='create_assignment'){
   const classes=(a.class_ids||[]).map(c=>'کلاس '+c).join(' و ');
-  return `ثبت تکلیف جدید\nعنوان: ${a.title}\nتوضیحات: ${a.description||'بدون توضیح'}\nمقصد: ${classes}\nگروه: ${a.group_id?'گروه '+a.group_id:'همه گروه‌ها'}\nمهلت: ${a.due_shamsi||'تعیین‌نشده'}`;
+  return `ثبت تکلیف جدید\nعنوان: ${a.title}\nتوضیحات: ${a.description||'بدون توضیح'}\nمقصد: ${classes}\nگروه: ${a.group_id?'گروه '+a.group_id:'همه گروه‌ها'}\nمهلت: ${(a.due_at?new Date(a.due_at).toLocaleString('fa-IR'):'تعیین‌نشده')}`;
  }
  if(action?.name==='create_report')return `ثبت گزارش کار\nعنوان: ${a.title}\nمتن: ${a.content}\nکلاس حساب: ${profileClass(profile)}\nگروه: ${profile?.role==='leader'?'گروه '+profile.group_id:'گروه '+a.group_id}`;
  if(action?.name==='add_score')return `ثبت امتیاز\nکلاس: ${a.class_id}\nگروه: ${a.group_id}\nامتیاز: ${a.points}\nدلیل: ${a.reason}`;
@@ -1294,7 +1294,7 @@ async function assistantApprovePending(){
   const {data,error}=await sb.functions.invoke('site-assistant',{body:{approve_action:assistantPendingAction}});
   if(error)throw new Error(error.message||'ثبت عملیات انجام نشد.');
   if(data?.error)throw new Error(data.error);
-  const message=data?.message||'عملیات با موفقیت ثبت شد.';
+  const message=data?.result?.message||data?.message||'عملیات با موفقیت ثبت شد.';
   assistantAddBubble(message);
   assistantHistory.push({role:'assistant',content:message});
   $('assistantPendingAction').classList.add('hidden');$('assistantPendingAction').replaceChildren();assistantPendingAction=null;
