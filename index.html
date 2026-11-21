@@ -5,8 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#080d1c">
 <meta name="description" content="سامانه ریاضی مدرسه امام رضا واحد ۳؛ مدیریت کلاس‌ها، تکالیف، گزارش کار و پیام‌ها">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="manifest" href="/riazi-school/manifest.webmanifest?v=6">
+<link rel="apple-touch-icon" href="/riazi-school/icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ریاضی امام رضا">
 <title>سامانه ریاضی مدرسه امام رضا واحد ۳</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -120,6 +123,11 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:12p
 </div>
 </div>
 
+<div class="install-panel" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px">
+  <button class="secondary" id="installBtn" type="button">نصب اپلیکیشن</button>
+  <span id="installHelp" class="hint">برای افزودن آیکون سامانه به گوشی، دکمهٔ نصب را بزنید.</span>
+</div>
+
 <section id="loginView" class="card login">
 <h2 style="margin-top:0">ورود به سامانه</h2>
 <p class="hint">ابتدا اطلاعات حساب خود را وارد کنید. ورود فقط با رمز صحیح حساب انجام می‌شود.</p>
@@ -176,7 +184,6 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:12p
 <div class="hint" id="userMeta"></div>
 </div>
 <div class="top-actions">
-<button class="secondary hidden" id="installBtn">نصب اپلیکیشن</button>
 <button class="secondary" id="logoutBtn">خروج از حساب</button>
 </div>
 </header>
@@ -515,7 +522,7 @@ function setMsg(t,ok=false){
  $('loginMsg').textContent=t;
 }
 
-/* تشخیص هویت پشتیبان — پشتیبانی از نوشتار فارسی/عربی و نام فیلدهای متداول پروفایل */
+/* تشخیص هویت پشتیبان از ردیف profiles و فرادادهٔ حساب احراز هویت‌شده */
 function normalizeSupportText(value){
  return String(value??'')
   .normalize('NFKC')
@@ -524,29 +531,55 @@ function normalizeSupportText(value){
   .replace(/ـ/g,'')
   .replace(/[\u064B-\u065F\u0670]/g,'')
   .toLowerCase()
-  .replace(/[\s\u200c\u200f\u202a-\u202e_-]+/g,'');
+  .replace(/[\s\u200c\u200f\u202a-\u202e_\-]+/g,'');
 }
 function inferSupportKey(p){
  if(!p||typeof p!=='object')return null;
- const fields=[
-  'support_key','support_identity','support_type','support_name',
-  'support_full_name','support_display_name','full_name','fullName',
-  'display_name','name','username','email','first_name','last_name',
-  'family_name','surname','نام','نام_خانوادگی','شناسه_پشتیبانی'
+ const classify=value=>{
+  const v=normalizeSupportText(value);
+  if(!v)return null;
+  const r=v.includes('rahmati')||v.includes('رحمتی');
+  const h=v.includes('hajibadi')||v.includes('hajabadi')||v.includes('حاجیآبادی')||v.includes('حاجیابادی');
+  return r===h?null:(r?'rahmati':'hajibadi');
+ };
+ // فیلدهای کلیدی مستقیم در جدول profiles اولویت قطعی دارند.
+ const direct=[p.support_key,p.support_identity,p.supportKey,p.supportIdentity]
+  .map(classify).filter(Boolean);
+ if(direct.length){
+  const unique=[...new Set(direct)];
+  return unique.length===1?unique[0]:null;
+ }
+ const explicitFields=[
+  'support_key','supportKey','support_identity','supportIdentity',
+  'support_type','supportType','support_name','supportName',
+  'support_full_name','supportFullName','support_display_name','supportDisplayName',
+  'supporter_key','supporter_identity','supporter_name','supporterName',
+  'staff_identity','staff_name','account_identity','identity_key',
+  'شناسه_پشتیبانی','هویت_پشتیبان'
+ ];
+ const metaObjects=[p.user_metadata,p.raw_user_meta_data,p.metadata,p.app_metadata,p.appMetadata]
+  .filter(x=>x&&typeof x==='object');
+ const explicitValues=[];
+ for(const field of explicitFields){if(p[field]!=null)explicitValues.push(p[field]);}
+ for(const meta of metaObjects){for(const field of explicitFields){if(meta[field]!=null)explicitValues.push(meta[field]);}}
+ const explicit=explicitValues.map(classify).filter(Boolean);
+ if(explicit.length){
+  const unique=[...new Set(explicit)];
+  return unique.length===1?unique[0]:null;
+ }
+ // در نبود شناسهٔ صریح، از نام و ایمیل خود حساب احراز هویت‌شده کمک می‌گیریم.
+ const nameFields=[
+  'full_name','fullName','display_name','displayName','name','username','email',
+  'first_name','firstName','last_name','lastName','family_name','surname',
+  'person_name','position','title','role_name',
+  'نام','نام_خانوادگی','نام_نمایشی'
  ];
  const values=[];
- for(const field of fields){if(p[field]!=null)values.push(p[field]);}
- for(const meta of [p.user_metadata,p.raw_user_meta_data,p.metadata]){
-  if(meta&&typeof meta==='object'){
-   for(const field of fields){if(meta[field]!=null)values.push(meta[field]);}
-  }
- }
- const raw=values.map(normalizeSupportText).filter(Boolean);
- const rahmati=raw.some(v=>v.includes('rahmati')||v.includes('رحمتی'));
- const hajibadi=raw.some(v=>v.includes('hajibadi')||v.includes('hajabadi')||v.includes('حاجیآبادی')||v.includes('حاجیابادی'));
- // اگر داده‌های پروفایل دو هویت متفاوت را نشان دهند، هویت را حدس نمی‌زنیم.
- if(rahmati===hajibadi)return null;
- return rahmati?'rahmati':'hajibadi';
+ for(const field of nameFields){if(p[field]!=null)values.push(p[field]);}
+ for(const meta of metaObjects){for(const field of nameFields){if(meta[field]!=null)values.push(meta[field]);}}
+ const detected=values.map(classify).filter(Boolean);
+ const unique=[...new Set(detected)];
+ return unique.length===1?unique[0]:null;
 }
 function getRecipientKey(){return isTeacher()?'teacher':supportIdentity}
 
@@ -602,8 +635,16 @@ $('loginBtn').onclick=async()=>{
   if(role.startsWith('support-')){
    if(pr.role!=='support')throw new Error('این حساب، حساب پشتیبان نیست.');
    const expected=role==='support-rahmati'?'rahmati':'hajibadi';
-   const detected=inferSupportKey({...pr,email:data.user.email});
-   if(!detected)throw new Error('هویت پشتیبان در پروفایل مشخص نشده است.');
+   const authUserMetadata=data.user?.user_metadata||{};
+   const authAppMetadata=data.user?.app_metadata||{};
+   const detected=inferSupportKey({
+    ...pr,
+    email:data.user?.email,
+    user_metadata:authUserMetadata,
+    raw_user_meta_data:authUserMetadata,
+    app_metadata:authAppMetadata
+   });
+   if(!detected)throw new Error('ورود و نقش پشتیبان تأیید شد، اما هویت دقیق حساب در پروفایل یا فرادادهٔ حساب پیدا نشد. برای حساب رحمتی، ستون profiles.support_key باید مقدار rahmati داشته باشد. راهنمای تنظیم در فایل جداگانه SUPPORT-IDENTITY-SETUP.sql است.');
    if(detected!==expected)throw new Error('نوع حساب انتخاب‌شده صحیح نیست.');
    supportIdentity=detected;
   }
@@ -1207,31 +1248,67 @@ $('cancelReply').onclick=()=>{
  if(data.session)await sb.auth.signOut();
 })();
 
-/* نصب‌پذیری PWA */
-let deferredInstallPrompt=null;
+/* نصب‌پذیری PWA — دکمه در صفحه ورود هم در دسترس است */
+let deferredInstallPrompt = null;
+const installBtn = $('installBtn');
+const installHelp = $('installHelp');
+function setInstallHelp(message){ if(installHelp) installHelp.textContent = message; }
 
-window.addEventListener('beforeinstallprompt',event=>{
- event.preventDefault();
- deferredInstallPrompt=event;
- $('installBtn')?.classList.remove('hidden');
+if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+  installBtn.textContent = 'برنامه نصب شده است';
+  installBtn.disabled = true;
+  setInstallHelp('سامانه به‌صورت برنامه روی این دستگاه باز شده است.');
+}
+
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  installBtn.classList.remove('hidden');
+  installBtn.disabled = false;
+  installBtn.textContent = 'نصب اپلیکیشن';
+  setInstallHelp('آماده نصب؛ دکمهٔ نصب اپلیکیشن را بزنید.');
 });
 
-$('installBtn')?.addEventListener('click',async()=>{
- if(!deferredInstallPrompt){
-  alert('برای نصب، سایت را با Chrome و از نشانی HTTPS باز کنید.');
-  return;
- }
- deferredInstallPrompt.prompt();
- await deferredInstallPrompt.userChoice;
- deferredInstallPrompt=null;
- $('installBtn').classList.add('hidden');
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  installBtn.textContent = 'برنامه نصب شد';
+  installBtn.disabled = true;
+  setInstallHelp('آیکون سامانه باید در فهرست برنامه‌ها یا صفحهٔ اصلی دیده شود.');
 });
 
-if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
- window.addEventListener('load',()=>{
-  navigator.serviceWorker.register('./sw.js')
-  .catch(err=>console.warn('Service worker registration failed:',err));
- });
+installBtn?.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) {
+    alert('Chrome هنوز نصب خودکار را برای این دستگاه فعال نکرده است. در منوی سه‌نقطهٔ Chrome گزینهٔ «Install app» یا «افزودن به صفحه اصلی» را بررسی کنید. گزینهٔ «دانلود آفلاین» فقط صفحه را ذخیره می‌کند و آیکون برنامه نمی‌سازد. اگر هیچ‌کدام از گزینه‌های نصب وجود ندارد، لطفاً از صفحهٔ سایت در Chrome گزارش نصب‌پذیری بگیرید.');
+    return;
+  }
+  installBtn.disabled = true;
+  try {
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    if (choice && choice.outcome === 'accepted') {
+      installBtn.textContent = 'درخواست نصب ارسال شد…';
+      setInstallHelp('Chrome در حال تکمیل نصب است.');
+    } else {
+      installBtn.disabled = false;
+      installBtn.textContent = 'نصب اپلیکیشن';
+      setInstallHelp('نصب لغو شد؛ برای تلاش دوباره دکمه را بزنید.');
+    }
+  } catch (err) {
+    console.warn('PWA install prompt failed:', err);
+    installBtn.disabled = false;
+    installBtn.textContent = 'تلاش دوباره برای نصب';
+    setInstallHelp('Chrome نتوانست نصب را کامل کند.');
+  } finally {
+    deferredInstallPrompt = null;
+  }
+});
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/riazi-school/sw.js?v=6', { scope: '/riazi-school/' })
+      .then(reg => reg.update().catch(() => {}))
+      .catch(err => console.warn('Service worker registration failed:', err));
+  });
 }
 
 /* پس‌زمینه متحرک */

@@ -1,27 +1,45 @@
 {
-  "id": "./",
+  "id": "/riazi-school/",
   "name": "سامانه ریاضی مدرسه امام رضا واحد ۳",
   "short_name": "ریاضی امام رضا",
   "description": "سامانه مدیریت کلاس‌های ریاضی، تکالیف، گزارش کار و پیام‌ها",
   "lang": "fa",
   "dir": "rtl",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/riazi-school/",
+  "scope": "/riazi-school/",
   "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
   "background_color": "#080d1c",
   "theme_color": "#080d1c",
+  "prefer_related_applications": false,
   "icons": [
     {
-      "src": "icons/icon-192.png",
+      "src": "/riazi-school/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "/riazi-school/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/riazi-school/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/riazi-school/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
